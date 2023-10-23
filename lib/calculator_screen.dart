@@ -1,5 +1,6 @@
 import 'package:calculadora/button_values.dart';
 import 'package:flutter/material.dart';
+import 'package:math_expressions/math_expressions.dart';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({Key? key}) : super(key: key);
@@ -9,10 +10,11 @@ class CalculatorScreen extends StatefulWidget {
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  String number1 = "";
-  String operand = "";
-  String number2 = "";
-  String result = "";
+  String equation = "0"; // La expresión matemática actual
+  String result = "0"; // El resultado de la evaluación
+  String expression = ""; // La expresión que se evaluará
+  double equationFontSize = 28.0; // Tamaño de fuente para la expresión
+  double resultFontSize = 38.0; // Tamaño de fuente para el resultado
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +33,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   alignment: Alignment.bottomRight,
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    "$number1$operand$number2".isEmpty
-                        ? "0"
-                        : "$number1$operand$number2",
-                    style: const TextStyle(
-                      fontSize: 48,
+                    equation,
+                    style: TextStyle(
+                      fontSize: equationFontSize,
                       fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.end,
@@ -48,9 +48,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               alignment: Alignment.bottomRight,
               padding: const EdgeInsets.all(16),
               child: Text(
-                result.isEmpty ? "0" : result,
-                style: const TextStyle(
-                  fontSize: 48,
+                result,
+                style: TextStyle(
+                  fontSize: resultFontSize,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.end,
@@ -77,6 +77,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
+  // Construye los botones
   Widget buildButton(value) {
     return Padding(
       padding: const EdgeInsets.all(1.0),
@@ -84,7 +85,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         color: getBtnColor(value),
         clipBehavior: Clip.hardEdge,
         shape: const OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white24),
+          borderSide: BorderSide(color: Colors.black),
           borderRadius: BorderRadius.zero,
         ),
         child: InkWell(
@@ -94,7 +95,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 24,
+                fontSize: 20,
+                color: Colors.black,
               ),
             ),
           ),
@@ -103,126 +105,58 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
+  // Función llamada cuando se toca un botón
   void onBtnTap(String value) {
-    if (value == Btn.del) {
-      delete();
-      return;
-    }
-    if (value == Btn.clr) {
-      clearAll();
-      return;
-    }
-
-    if (value == Btn.per) {
-      convertToPercentage();
-      return;
-    }
-
-    if (value == Btn.calculate) {
-      calculate();
-      return;
-    }
-    appendValue(value);
-  }
-
-  void calculate() {
-    if (number1.isEmpty || operand.isEmpty || number2.isEmpty) return;
-
-    final double num1 = double.parse(number1);
-    final double num2 = double.parse(number2);
-
-    var res = 0.0;
-
-    switch (operand) {
-      case Btn.add:
-        res = num1 + num2;
-        break;
-      case Btn.subtract:
-        res = num1 - num2;
-        break;
-      case Btn.multiply:
-        res = num1 * num2;
-        break;
-      case Btn.divide:
-        res = num1 / num2;
-        break;
-      default:
-    }
-
     setState(() {
-      result = res.toString();
-      if (result.endsWith(".0")) {
-        result = result.substring(0, result.length - 2);
-      }
+      if (value == Btn.clr) {
+        // Limpiar todo
+        equation = "0";
+        result = "0";
+        equationFontSize = 28.0;
+        resultFontSize = 38.0;
+      } else if (value == Btn.del) {
+        // Eliminar último carácter
+        equationFontSize = 38.0;
+        resultFontSize = 28.0;
+        equation = equation.substring(0, equation.length - 1);
+        if (equation == "") {
+          equation = "0";
+        }
+      } else if (value == Btn.calculate) {
+        // Calcular el resultado
+        equationFontSize = 28.0;
+        resultFontSize = 38.0;
 
-      operand = "";
-      number1 = "";
-      number2 = "";
+        expression = equation;
+        expression = expression.replaceAll('×', '*');
+        expression = expression.replaceAll('÷', '/');
+
+        try {
+          Parser p = Parser();
+          Expression exp = p.parse(expression);
+
+          ContextModel cm = ContextModel();
+          result = '${exp.evaluate(EvaluationType.REAL, cm)}';
+        } catch (e) {
+          result = "Error";
+        }
+      } else {
+        // Agregar valor a la expresión
+        equationFontSize = 38.0;
+        resultFontSize = 28.0;
+        if (equation == "0") {
+          equation = value;
+        } else {
+          equation = equation + value;
+        }
+      }
     });
   }
 
-  void delete() {
-    if (number2.isNotEmpty) {
-      number2 = number2.substring(0, number2.length - 1);
-    } else if (operand.isNotEmpty) {
-      operand = "";
-    } else if (number1.isNotEmpty) {
-      number1 = number1.substring(0, number1.length - 1);
-    } else {
-      number1 = "0";
-    }
-
-    setState(() {});
-  }
-
-  void clearAll() {
-    setState(() {
-      number1 = "";
-      operand = "";
-      number2 = "";
-      result = "";
-    });
-  }
-
-  void convertToPercentage() {
-    if (number1.isEmpty && operand.isNotEmpty && number2.isNotEmpty) {
-      calculate();
-    }
-    if (operand.isNotEmpty) {
-      return;
-    }
-    final number = double.parse(number1);
-    setState(() {
-      number1 = "";
-      operand = "";
-      number2 = "";
-      result = "${(number / 100)}";
-    });
-  }
-
-  void appendValue(String value) {
-    if (value != Btn.dot && int.tryParse(value) == null) {
-      if (operand.isNotEmpty && number2.isNotEmpty) {}
-      operand = value;
-    } else if (number1.isEmpty || operand.isEmpty) {
-      if (value == Btn.dot && number1.contains(Btn.dot)) return;
-      if (value == Btn.dot && number1.isEmpty || number1 == Btn.dot) {
-        value = "0.";
-      }
-      number1 += value;
-    } else if (number2.isEmpty || operand.isNotEmpty) {
-      if (value == Btn.dot && number2.contains(Btn.dot)) return;
-      if (value == Btn.dot && number2.isEmpty || number2 == Btn.dot) {
-        value = "0.";
-      }
-      number2 += value;
-    }
-    setState(() {});
-  }
-
+  // Obtiene el color del botón
   Color getBtnColor(value) {
     return [Btn.del, Btn.clr].contains(value)
-        ? Colors.blueGrey
+        ? Colors.redAccent
         : [
             Btn.multiply,
             Btn.add,
